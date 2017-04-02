@@ -1,4 +1,9 @@
-module CP4_processor_nbv3(clock, reset, /*ps2_key_pressed, ps2_out, lcd_write, lcd_data,*/ dmem_data_in, dmem_address, dmem_out);
+module CP4_processor_nbv3(clock, reset, /*ps2_key_pressed, ps2_out, lcd_write, lcd_data,*/ dmem_data_in, 
+dmem_address, dmem_out, fetch_pipe_pc, fetch_pipe_instruction, pipe_decode_pc, pipe_decode_instruction,
+decode_pipe_pc, decode_pipe_instruction, pipe_execute_pc, pipe_execute_instruction, execute_pipe_data, execute_pipe_instruction,
+execute_pipe_address, pipe_memory_address, pipe_memory_data, pipe_memory_instruction, memory_pipe_from_memory, memory_pipe_not_from_memory,
+pipe_write_from_memory, pipe_write_not_from_memory, pipe_write_instruction, memory_pipe_instruction, decode_pipe_a, decode_pipe_b, pipe_execute_a,
+pipe_execute_b);
 
 	input 			clock, reset/*, ps2_key_pressed*/;
 	//input 	[7:0]	ps2_out;
@@ -11,22 +16,53 @@ module CP4_processor_nbv3(clock, reset, /*ps2_key_pressed, ps2_out, lcd_write, l
 	output	[11:0]   dmem_address;
 	
 	wire writeEnable;
+	assign writeEnable = 1'b1;
 	wire [31:0] data_writeReg;
+	wire [4:0] address_writeReg;
 
 	
 	// Testing
-   fetch_stage fetch(clock, reset, pc_wires, pc_wires, instruction_wires);
-	wire [11:0] fetch_pipe_pc;
-	wire [31:0] fetch_pipe_instruction;
-	FDPipe fdpipe(clock, reset, pc_wires, instruction_wires, pipepc, pipeinst);
-	wire [11:0] pipe_decode_pc;
-	wire [31:0] pipe_decode_instruction;
-	decode_stage decode(clock, reset, ctrl_writeEnable, data_writeReg, pipe_decode_pc, pipe_decode_instruction,
-								decode_pipe_pc, decode_pipe_instruction, rs, rt);
-	wire [11:0] decode_pipe_pc;
-	wire [31:0] decode_pipe_instruction;
-	wire [31:0] rs, rt;
-	DXPipe dxpipe(clock, reset, )
+	wire [11:0] next_pc;
+	assign next_pc = (reset) ? 11'd0 : fetch_pipe_pc;
+	
+   fetch_stage fetch(clock, reset, next_pc, fetch_pipe_pc, fetch_pipe_instruction);
+	output [11:0] fetch_pipe_pc;
+	output [31:0] fetch_pipe_instruction;
+	FDPipe fdpipe(clock, reset, fetch_pipe_pc, fetch_pipe_instruction, pipe_decode_pc, pipe_decode_instruction);
+	output [11:0] pipe_decode_pc;
+	output [31:0] pipe_decode_instruction;
+	decode_stage decode(clock, reset, writeEnable, address_writeReg, data_writeReg, pipe_decode_pc, pipe_decode_instruction,
+								decode_pipe_pc, decode_pipe_instruction, decode_pipe_a, decode_pipe_b);
+	output [11:0] decode_pipe_pc;
+	output [31:0] decode_pipe_instruction;
+	output [31:0] decode_pipe_a, decode_pipe_b;
+	DXPipe dxpipe(clock, reset, decode_pipe_pc, decode_pipe_instruction, decode_pipe_a, decode_pipe_b, pipe_execute_pc, 
+						pipe_execute_instruction, pipe_execute_a, pipe_execute_b);
+	output [11:0] pipe_execute_pc;
+	output [31:0] pipe_execute_instruction;
+	output [31:0] pipe_execute_a, pipe_execute_b;
+	execute_stage execute(clock, reset, pipe_execute_pc, pipe_execute_instruction, pipe_execute_a, pipe_execute_b, execute_pipe_instruction,
+	execute_pipe_address, execute_pipe_data);
+	output [31:0] execute_pipe_data, execute_pipe_instruction;
+	output [31:0] execute_pipe_address;
+	
+	XMPipe xmpipe(clock, reset, execute_pipe_data, execute_pipe_address, execute_pipe_instruction, pipe_memory_address, pipe_memory_data,
+	pipe_memory_instruction);
+	
+	output [31:0] pipe_memory_data, pipe_memory_address, pipe_memory_instruction;
+	
+	memory_stage memory(clock, reset, pipe_memory_address, pipe_memory_data, pipe_memory_instruction, 
+	memory_pipe_not_from_memory, memory_pipe_from_memory, memory_pipe_instruction);
+	
+	output [31:0] memory_pipe_from_memory, memory_pipe_not_from_memory, memory_pipe_instruction;
+	
+	MWPipe mwpipe(clock, reset, memory_pipe_not_from_memory, memory_pipe_from_memory, memory_pipe_instruction,
+	pipe_write_not_from_memory, pipe_write_from_memory, pipe_write_instruction);
+	
+	output [31:0] pipe_write_from_memory, pipe_write_not_from_memory, pipe_write_instruction;
+	
+	write_stage write(clock, reset, pipe_write_from_memory, pipe_write_not_from_memory, pipe_write_instruction, 
+		address_writeReg, data_writeReg);
 	
 	// your processor here
 	
@@ -42,52 +78,164 @@ module CP4_processor_nbv3(clock, reset, /*ps2_key_pressed, ps2_out, lcd_write, l
 
 	
 	
-	// You'll need to change where the dmem and imem read and write...
-	dmem mydmem(.address	(dmem_address),
-					.clock		(clock),
-					.data		(debug_data),
-					.wren		(1'b1), //,	//need to fix this!
-					.q			(dmem_out) // change where output q goes...
-	);
 	
+endmodule
+
+module write_stage(clock, reset, pipe_write_from_memory, pipe_write_not_from_memory, pipe_write_instruction, write_register,
+write_value);
+
+	input clock, reset;
+	input [31:0] pipe_write_from_memory, pipe_write_not_from_memory, pipe_write_instruction;
+	
+	output [4:0] write_register;
+	output [31:0] write_value;
+	// output, shouldWrite??
+	
+	// check if always rd, i.e. jal
+	assign write_register = pipe_write_instruction[26:22];
+	// Logic here for what to write
+	wire signal;
+	assign signal = 1'b1;
+	assign write_value = (signal) ? pipe_write_not_from_memory : pipe_write_not_from_memory;
 	
 	
 endmodule
 
-module DXPipe(clock, reset, in_pc, in_instruction, in_rs, in_rt, out_pc, out_instruction, out_rs, out_rt);
+module MWPipe(clock, reset, memory_pipe_not_from_memory, memory_pipe_from_memory, memory_pipe_instruction,
+pipe_write_not_from_memory, pipe_write_from_memory, pipe_write_instruction);
+
+	input clock, reset;
+	input [31:0] memory_pipe_from_memory, memory_pipe_not_from_memory, memory_pipe_instruction;
+	
+	output [31:0] pipe_write_from_memory, pipe_write_not_from_memory, pipe_write_instruction;
+	
+	CP1_reg_nbv3 from_memory_latch(clock, reset, 1'b1, 1'b1, memory_pipe_from_memory, pipe_write_from_memory);
+	CP1_reg_nbv3 instruction_latch(clock, reset, 1'b1, 1'b1, memory_pipe_instruction, pipe_write_instruction);
+	CP1_reg_nbv3 not_from_memory_latch(clock, reset, 1'b1, 1'b1, memory_pipe_not_from_memory, pipe_write_not_from_memory);
+	
+
+endmodule
+
+module memory_stage(clock, reset, pipe_memory_address, pipe_memory_data, pipe_memory_instruction, not_from_memory, from_memory, memory_pipe_instruction);
+	
+	input clock, reset;
+	input [31:0] pipe_memory_address, pipe_memory_data, pipe_memory_instruction;
+	
+	output [31:0] from_memory, not_from_memory, memory_pipe_instruction;
+	
+	assign memory_pipe_instruction = pipe_memory_instruction;
+	
+	assign not_from_memory = pipe_memory_address;
+	// Check memory logic below for different instructions
+//	dmem mydmem(.address	(pipe_memory_address),
+//					.clock		(clock),
+//					.data		(pipe_memory_data),
+//					.wren		(1'b1), //,	//need to fix this!
+//					.q			(from_memory) // change where output q goes...
+//	);
+	
+	
+endmodule
+
+module XMPipe(clock, reset, execute_pipe_data, execute_pipe_address, execute_pipe_instruction, pipe_memory_address, pipe_memory_data, pipe_memory_instruction);
+	
+	input clock, reset;
+	
+	input [31:0] execute_pipe_data, execute_pipe_address, execute_pipe_instruction;
+	output [31:0] pipe_memory_address, pipe_memory_data, pipe_memory_instruction;
+	
+	CP1_reg_nbv3 address_latch(clock, reset, 1'b1, 1'b1, execute_pipe_address, pipe_memory_address);
+	CP1_reg_nbv3 instruction_latch(clock, reset, 1'b1, 1'b1, execute_pipe_instruction, pipe_memory_instruction);
+	CP1_reg_nbv3 data_latch(clock, reset, 1'b1, 1'b1, execute_pipe_data, pipe_memory_data);
+	
+endmodule
+
+module execute_stage(clock, reset, pipe_execute_pc, pipe_execute_instruction, pipe_execute_a, pipe_execute_b,
+execute_pipe_instruction, execute_pipe_address, execute_pipe_data);
+
+	input clock, reset;
+	input [11:0] pipe_execute_pc;
+	input [31:0] pipe_execute_instruction, pipe_execute_a, pipe_execute_b;
+	
+	output [31:0] execute_pipe_instruction, execute_pipe_data, execute_pipe_address;
+	
+	wire [4:0] opcode, shamt, aluop;
+	wire [16:0] N;
+	
+	assign opcode = pipe_execute_instruction[31:27];
+	assign shamt = pipe_execute_instruction[11:7];
+	// Will eventually need to handle bne and blt for subtraction
+	assign aluop = (opcode == 5'b00000) ? pipe_execute_instruction[6:2] : 5'b00000;
+	
+	assign N = pipe_execute_instruction[16:0];
+	wire [31:0] N_extended;
+	assign N_extended[16:0] = N;
+	genvar i;
+	
+	generate
+		for (i=17; i<32; i=i+1) begin: loop100
+			assign N_extended[i] = (N_extended[16] == 1'b0) ? 1'b0 : 1'b1 ;
+		end
+	endgenerate
+	
+	wire overflow, isNotEqual, isLessThan;
+	wire [31:0] data_result;
+	
+	wire [31:0] argument_B;
+	assign argument_B = (opcode == 5'b00101) ? N_extended : pipe_execute_b;
+	// Hardcoded in rs rt for testing - will need to change for controls
+	CP2_alu_nbv3 alu(pipe_execute_a, argument_B, aluop, shamt, data_result,
+					isNotEqual, isLessThan, overflow);
+	
+	
+	assign execute_pipe_instruction = pipe_execute_instruction;
+	// Note that the address memory value is the output from the alu
+	assign execute_pipe_address = data_result;
+	assign execute_pipe_data = pipe_execute_b;
+	
+
+endmodule
+
+module DXPipe(clock, reset, in_pc, in_instruction, in_a, in_b, out_pc, out_instruction, out_a, out_b);
 	
 	input clock, reset;
 	
 	input [11:0] in_pc;
-	input [31:0] in_instruction, in_rs, in_rt;
+	input [31:0] in_instruction, in_a, in_b;
 	
 	output [11:0] out_pc;
-	output [31:0] out_instruction, out_rs, out_rt;
+	output [31:0] out_instruction, out_a, out_b;
 	
-	CP1_reg_nbv3 pc_latch(clock, clear, 1'b1, 1'b1, in_pc, out_pc);
-	CP1_reg_nbv3 instruction_latch(clock, clear, 1'b1, 1'b1, in_instruction, out_instruction);
-	CP1_reg_nbv3 rs_latch(clock, clear, 1'b1, 1'b1, in_rs, out_rs);
-	CP1_reg_nbv3 rt_latch(clock, clear, 1'b1, 1'b1, in_rt, out_rt);
+	CP1_reg_nbv3 pc_latch(clock, reset, 1'b1, 1'b1, in_pc, out_pc);
+	CP1_reg_nbv3 instruction_latch(clock, reset, 1'b1, 1'b1, in_instruction, out_instruction);
+	CP1_reg_nbv3 a_latch(clock, reset, 1'b1, 1'b1, in_a, out_a);
+	CP1_reg_nbv3 b_latch(clock, reset, 1'b1, 1'b1, in_b, out_b);
 	
 endmodule
 
-module decode_stage(clock, reset, ctrl_writeEnable, data_writeReg, in_pc, in_instruction, out_pc, out_instruction, out_rs, out_rt);
+module decode_stage(clock, reset, ctrl_writeEnable, address_writeReg, data_writeReg, in_pc, in_instruction, out_pc, out_instruction, out_a, out_b);
 	
 	input clock, reset;
 	input [11:0] in_pc;
 	input [31:0] in_instruction, data_writeReg;
+	input [4:0] address_writeReg;
 	input ctrl_writeEnable;
 	
 	output [11:0] out_pc;
-	output [31:0] out_instruction, out_rs, out_rt;
+	output [31:0] out_instruction, out_a, out_b;
 	
 	assign out_pc = in_pc;
 	assign out_instruction = in_instruction;
 	
+	wire [4:0] readRegA, readRegB;
+	assign readRegA = in_instruction[21:17];
+	assign readRegB = ((in_instruction[31:27] == 5'b00000)) ? in_instruction[16:12] : in_instruction[26:22];
+	
+	
 	CP1_regfile_nbv3 regfile(
 	clock, ctrl_writeEnable, reset,
-	in_instruction[26:22], in_instruction[21:17], in_instruction[16:12],
-	data_writeReg, out_rs, out_rt);
+	address_writeReg, readRegA, readRegB,
+	data_writeReg, out_a, out_b);
 	
 	
 endmodule
@@ -102,8 +250,8 @@ module FDPipe(clock, reset, in_pc, in_instruction, out_pc, out_instruction);
 	output [11:0] out_pc;
 	output [31:0] out_instruction;
 	
-	CP1_reg_nbv3 pc_latch(clock, clear, 1'b1, 1'b1, in_pc, out_pc);
-	CP1_reg_nbv3 instruction_latch(clock, clear, 1'b1, 1'b1, in_instruction, out_instruction);
+	CP1_reg_nbv3 pc_latch(clock, reset, 1'b1, 1'b1, in_pc, out_pc);
+	CP1_reg_nbv3 instruction_latch(clock, reset, 1'b1, 1'b1, in_instruction, out_instruction);
 	
 endmodule
 
@@ -119,7 +267,7 @@ module fetch_stage(clock, reset, in_address, next_address, out_instruction);
 
 	program_counter pc(.clock(clock), .reset(reset), .in_address(in_address), .out_address(out_address));
 	
-	adder next_instruction(out_address, 32'd1, overflow, next_address, 1'b0);
+	adder_mod next_instruction(out_address, 32'd1, overflow, next_address, 1'b0);
 	
 	imem myimem(.address 	(out_address),
 					.clken		(1'b1),
@@ -205,14 +353,373 @@ module CP1_reg_nbv3(clock, clear, ctrl_writeEnable, ctrl_outputEnable,
 	
 endmodule
 
-module adder(data_operandA, data_operandB,
+
+module CP2_alu_nbv3(data_operandA, data_operandB, ctrl_ALUopcode, ctrl_shiftamt, data_result,
+isNotEqual, isLessThan, overflow);
+	
+	input [31:0] data_operandA, data_operandB;
+	input [4:0] ctrl_ALUopcode, ctrl_shiftamt;
+	
+	output [31:0] data_result;
+	output isNotEqual, isLessThan, overflow;
+	
+	// Organization
+	// Declare the output wires from the different modules
+	wire [31:0] add_output, subtract_output, shift_left_output, shift_right_output, bitwiseand_output, bitwiseor_output;
+	wire add_isNotEqual, subtract_isNotEqual;
+	wire add_isLessThan, subtract_isLessThan;
+	wire add_overflow, subtract_overflow;
+	
+	// Feed all necessary data into the different modules
+	
+	// Compute addition
+	adder	addition(data_operandA, data_operandB, add_isNotEqual, add_isLessThan, 
+		add_overflow, add_output, 1'b0);
+	
+	// Compute subtraction
+	
+	wire [31:0] not_data_operandB;
+	genvar i;
+	generate
+		for (i = 0; i < 32; i = i + 1)begin: loop0
+			assign not_data_operandB[i] = ~data_operandB[i];
+		end
+	endgenerate
+	
+	adder subtraction(data_operandA, not_data_operandB, subtract_isNotEqual, subtract_isLessThan, subtract_overflow, subtract_output, 1'b1);
+	
+	// Compute shift left
+	
+	logicalleft shiftleft(data_operandA, ctrl_shiftamt, shift_left_output);
+	
+	// Compute shift right
+	
+	arithmeticright shiftright(data_operandA, ctrl_shiftamt, shift_right_output);
+	
+	// Compute bitwise and
+	
+	bitwiseand bitand(data_operandA, data_operandB, bitwiseand_output);
+	
+	// Compute bitwise or
+	
+	bitwiseor bitor(data_operandA, data_operandB, bitwiseor_output);
+	
+	
+	
+	// User ternary's to assign the outputs to the data_result for different opcodes
+	// Build a ternary tree
+	
+	// least significant bit of ALUopcode
+	wire [31:0] branch0, branch1;
+	assign data_result = (ctrl_ALUopcode[0]) ? branch1 : branch0;
+	
+	// second least significant bit
+	wire [31:0] branch00, branch01, branch10, branch11;
+	assign branch0 = (ctrl_ALUopcode[1] == 1'b1) ? branch10 : branch00;
+	assign branch1 = (ctrl_ALUopcode[1] == 1'b1) ? branch11 : branch01;
+	
+	// third least significant bit
+	wire [31:0] branch000, branch001, branch100, branch101;
+	assign branch00 = (ctrl_ALUopcode[2] == 1'b1) ? branch100 : branch000;
+	assign branch01 = (ctrl_ALUopcode[2] == 1'b1) ? branch101 : branch001;
+	
+	// tie the ends together
+	assign branch000 = add_output;
+	assign branch100 = shift_left_output;
+	assign branch10 = bitwiseand_output;
+	assign branch11 = bitwiseor_output;
+	assign branch001 = subtract_output;
+	assign branch101 = shift_right_output;
+	
+	// tree for the other output
+	assign isNotEqual = subtract_isNotEqual;
+	assign isLessThan = subtract_isLessThan;
+	assign overflow = (ctrl_ALUopcode[0]) ? subtract_overflow : add_overflow;
+	
+endmodule 
+
+module bitwiseor(data_operandA, data_operandB, result);
+
+	input [31:0] data_operandA, data_operandB;
+	output [31:0] result;
+	
+	genvar i;
+	generate
+		for (i = 0; i < 32; i = i + 1)begin: loop7
+			or oriter(result[i], data_operandA[i], data_operandB[i]);
+		end
+	endgenerate
+
+
+endmodule
+
+module bitwiseand(data_operandA, data_operandB, result);
+
+	input [31:0] data_operandA, data_operandB;
+	output [31:0] result;
+	
+	genvar i;
+	generate
+		for (i = 0; i < 32; i = i + 1)begin: loop6
+			and anditer(result[i], data_operandA[i], data_operandB[i]);
+		end
+	endgenerate
+
+
+endmodule
+
+module arithmeticright(data_operandA, ctrl_shiftamt, result);
+	
+	// Maintain the sign bit
+	
+	input [31:0] data_operandA;
+	input [4:0] ctrl_shiftamt;
+	
+	output [31:0] result;
+	
+	// Shift by 16 first
+	wire [31:0] shifted_16, after_stage0;
+	
+	// first maintain the sign bit
+	genvar i;
+	generate
+		for (i = 31; i >= 16; i = i - 1)begin: loop23
+			assign shifted_16[i] = data_operandA[31];
+		end
+	endgenerate
+	
+	// then shift the rest
+	generate
+		for (i = 15; i >= 0; i = i - 1)begin: loop24
+			assign shifted_16[i] = data_operandA[i + 16];
+		end
+	endgenerate
+	
+	// should the shifted part move on to the next stage?
+	
+	assign after_stage0 = (ctrl_shiftamt[4]) ? shifted_16 : data_operandA;
+	
+	
+	
+	// Shift by 8 
+	wire [31:0] shifted_8, after_stage1;
+	
+	// first maintain the sign bit
+	generate
+		for (i = 31; i >= 24; i = i - 1)begin: loop6
+			assign shifted_8[i] = after_stage0[31];
+		end
+	endgenerate
+	
+	// then shift the rest
+	generate
+		for (i = 23; i >= 0; i = i - 1)begin: loop7
+			assign shifted_8[i] = after_stage0[i + 8];
+		end
+	endgenerate
+	
+	// should the shifted part move on to the next stage?
+	
+	assign after_stage1 = (ctrl_shiftamt[3]) ? shifted_8 : after_stage0;
+	
+	// Shift by 4
+	
+	wire [31:0] shifted_4, after_stage2;
+	
+// first maintain the sign bit
+	generate
+		for (i = 31; i >= 28; i = i - 1)begin: loop8
+			assign shifted_4[i] = after_stage1[31];
+		end
+	endgenerate
+	
+	// then shift the rest
+	generate
+		for (i = 27; i >= 0; i = i - 1)begin: loop9
+			assign shifted_4[i] = after_stage1[i + 4];
+		end
+	endgenerate
+	
+	// should the shifted part move on to the next stage?
+	
+	assign after_stage2 = (ctrl_shiftamt[2]) ? shifted_4 : after_stage1;
+
+	// Shift by 2
+	
+	wire [31:0] shifted_2, after_stage3;
+	
+// first maintain the sign bit
+	generate
+		for (i = 31; i >= 30; i = i - 1)begin: loop10
+			assign shifted_2[i] = after_stage2[31];
+		end
+	endgenerate
+	
+	// then shift the rest
+	generate
+		for (i = 29; i >= 0; i = i - 1)begin: loop11
+			assign shifted_2[i] = after_stage2[i + 2];
+		end
+	endgenerate
+	
+	// should the shifted part move on to the next stage?
+	
+	assign after_stage3 = (ctrl_shiftamt[1]) ? shifted_2 : after_stage2;
+
+	// Shift by 1
+	
+	wire [31:0] shifted_1, after_stage4;
+	
+// first maintain the sign bit
+	generate
+		for (i = 31; i >= 31; i = i - 1)begin: loop12
+			assign shifted_1[i] = after_stage3[31];
+		end
+	endgenerate
+	
+	// then shift the rest
+	generate
+		for (i = 30; i >= 0; i = i - 1)begin: loop13
+			assign shifted_1[i] = after_stage3[i + 1];
+		end
+	endgenerate
+	
+	// should the shifted part move on to the next stage?
+	
+	assign after_stage4 = (ctrl_shiftamt[0]) ? shifted_1 : after_stage3;
+	assign result = after_stage4;
+	
+
+endmodule
+
+module logicalleft(data_operandA, ctrl_shiftamt, result);
+
+	// Does not maintain sign bit
+
+	input [31:0] data_operandA;
+	input [4:0] ctrl_shiftamt;
+	
+	output [31:0] result;
+	
+	// Shift by 8 first
+	wire [31:0] shifted_16, after_stage0;
+	
+	// fill with 0's on the right
+	genvar i;
+	generate
+		for (i = 0; i < 16; i = i + 1)begin: loop30
+			assign shifted_16[i] = 1'b0;
+		end
+	endgenerate
+	
+	// then shift the rest
+	generate
+		for (i = 16; i < 32; i = i + 1)begin: loop22
+			assign shifted_16[i] = data_operandA[i - 16];
+		end
+	endgenerate
+	
+	// should the shifted part move on to the next stage?
+	
+	assign after_stage0 = (ctrl_shiftamt[4]) ? shifted_16 : data_operandA;
+	
+
+	// Shift by 8 
+	wire [31:0] shifted_8, after_stage1;
+	
+	// fill with 0's on the right
+	generate
+		for (i = 0; i < 8; i = i + 1)begin: loop14
+			assign shifted_8[i] = 1'b0;
+		end
+	endgenerate
+	
+	// then shift the rest
+	generate
+		for (i = 8; i < 32; i = i + 1)begin: loop15
+			assign shifted_8[i] = after_stage0[i - 8];
+		end
+	endgenerate
+	
+	// should the shifted part move on to the next stage?
+	
+	assign after_stage1 = (ctrl_shiftamt[3]) ? shifted_8 : after_stage0;
+	
+	// Shift by 4
+	wire [31:0] shifted_4, after_stage2;
+	
+	// fill with 0's on the right
+	generate
+		for (i = 0; i < 4; i = i + 1)begin: loop16
+			assign shifted_4[i] = 1'b0;
+		end
+	endgenerate
+	
+	// then shift the rest
+	generate
+		for (i = 4; i < 32; i = i + 1)begin: loop17
+			assign shifted_4[i] = after_stage1[i - 4];
+		end
+	endgenerate
+	
+	// should the shifted part move on to the next stage?
+	
+	assign after_stage2 = (ctrl_shiftamt[2]) ? shifted_4 : after_stage1;
+	
+	// Shift by 2
+	wire [31:0] shifted_2, after_stage3;
+	
+	// fill with 0's on the right
+	generate
+		for (i = 0; i < 2; i = i + 1)begin: loop18
+			assign shifted_2[i] = 1'b0;
+		end
+	endgenerate
+	
+	// then shift the rest
+	generate
+		for (i = 2; i < 32; i = i + 1)begin: loop19
+			assign shifted_2[i] = after_stage2[i - 2];
+		end
+	endgenerate
+	
+	// should the shifted part move on to the next stage?
+	
+	assign after_stage3 = (ctrl_shiftamt[1]) ? shifted_2 : after_stage2;
+	
+	// Shift by 2
+	wire [31:0] shifted_1, after_stage4;
+	
+	// fill with 0's on the right
+	generate
+		for (i = 0; i < 1; i = i + 1)begin: loop20
+			assign shifted_1[i] = 1'b0;
+		end
+	endgenerate
+	
+	// then shift the rest
+	generate
+		for (i = 1; i < 32; i = i + 1)begin: loop21
+			assign shifted_1[i] = after_stage3[i - 1];
+		end
+	endgenerate
+	
+	// should the shifted part move on to the next stage?
+	
+	assign after_stage4 = (ctrl_shiftamt[0]) ? shifted_1 : after_stage3;
+	assign result = after_stage4;
+	
+endmodule
+
+
+module adder(data_operandA, data_operandB, isNotEqual, isLessThan, 
 overflow, adder_output, cin);
 
 	input [31:0] data_operandA, data_operandB;
 	input cin;
 	
 	output [31:0] adder_output;
-	output overflow;
+	output isNotEqual, isLessThan, overflow;
 	
 	// Setup Overflow Logic
 	wire matched_msb;
@@ -220,6 +727,15 @@ overflow, adder_output, cin);
 	assign matched_msb = (data_operandA[31] == data_operandB[31]) ? 1'b1 : 1'b0; 
 	xor diffxor(different_sign, data_operandA[31], adder_output[31]);
 	and overflowand(overflow, matched_msb, different_sign);
+	
+	// Setup isNotEqual Logic
+	assign isNotEqual = (adder_output == 32'b0) ? 1'b0 : 1'b1;
+	
+	// Setup isLessThan Logic
+	// IF A - B is negative, then yeah, it's less than
+	wire posDiff;
+	assign posDiff = (adder_output[31] == 1'b0) ? 1'b0 : 1'b1;
+	xor isLessThanXOR(isLessThan, posDiff, overflow);
 	
 	// Setting up cascaded blocks
 	// First build c8, c16, c24, c32
@@ -464,4 +980,74 @@ module decoder32(code, decoding, enable);
 	and(decoding[30], enable, code[4], code[3], code[2], code[1], ~code[0]);
 	and(decoding[31], enable, code[4], code[3], code[2], code[1], code[0]);
 
+endmodule
+
+module adder_mod(data_operandA, data_operandB,
+overflow, adder_output, cin);
+
+	input [31:0] data_operandA, data_operandB;
+	input cin;
+	
+	output [31:0] adder_output;
+	output overflow;
+	
+	// Setup Overflow Logic
+	wire matched_msb;
+	wire different_sign;
+	assign matched_msb = (data_operandA[31] == data_operandB[31]) ? 1'b1 : 1'b0; 
+	xor diffxor(different_sign, data_operandA[31], adder_output[31]);
+	and overflowand(overflow, matched_msb, different_sign);
+	
+	// Setting up cascaded blocks
+	// First build c8, c16, c24, c32
+	
+	wire c8, c16, c24, c32;
+	wire [3:0] P;
+	wire [3:0] G;
+	
+	// build c8
+	wire P0cin;
+	and P0andcin(P0cin, cin, P[0]);
+	or c8or(c8, P0cin, G[0]);
+	
+	// build c16
+	wire P1P0cin;
+	and P1P0andcin(P1P0cin, P[1], P[0], cin);
+	wire P1G0;
+	and P1andG0(P1G0, P[1], G[0]);
+	or c16or(c16, P1G0, G[1], P1P0cin);
+	
+	// build c24
+	wire P2P1P0cin;
+	and P2P1P0andcin(P2P1P0cin, P[2], P[1], P[0], cin);
+	wire P2P1G0;
+	and P2P1andG0(P2P1G0, P[2], P[1], G[0]);
+	wire P2G1;
+	and P2andG1(P2G1, P[2], G[1]);
+	or c24or(c24, P2P1G0, G[2], P2P1P0cin, P2G1);
+	
+	// build c32
+	wire P3P2P1P0cin;
+	and P3P2P1P0andcin(P3P2P1P0cin, P[3], P[2], P[1], P[0], cin);
+	wire P3P2P1G0;
+	and P3P2P1andG0(P3P2P1G0, P[3], P[2], P[1], G[0]);
+	wire P3P2G1;
+	and P3P2andG1(P3P2G1, P[3], P[2], G[1]);
+	wire P3G2;
+	and P3andG2(P3G2, P[3], G[2]);
+	or c32or(c32, P3P2P1P0cin, P3P2P1G0, P3P2G1, P3G2, G[3]);
+	
+	// declare blocks
+	cla_block block0(.bits_operandA(data_operandA[7:0]), .bits_operandB(data_operandB[7:0]), .cin(cin), 
+	.block_output(adder_output[7:0]), .P(P[0]), .G(G[0]));
+	
+	cla_block block1(.bits_operandA(data_operandA[15:8]), .bits_operandB(data_operandB[15:8]), .cin(c8), 
+	.block_output(adder_output[15:8]), .P(P[1]), .G(G[1]));
+	
+	cla_block block2(.bits_operandA(data_operandA[23:16]), .bits_operandB(data_operandB[23:16]), .cin(c16), 
+	.block_output(adder_output[23:16]), .P(P[2]), .G(G[2]));
+	
+	cla_block block3(.bits_operandA(data_operandA[31:24]), .bits_operandB(data_operandB[31:24]), .cin(c24), 
+	.block_output(adder_output[31:24]), .P(P[3]), .G(G[3]));
+	
 endmodule
