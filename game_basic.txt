@@ -1,0 +1,89 @@
+.text
+
+
+initscore: addi $25, $0, 0 
+initlives: addi $24, $0, 3
+initscreenlength: addi $10, $0, 60000
+addi $10, $10, 60000
+addi $10, $10, 62000
+addi $10, $10, 65000
+addi $10, $10, 60200
+initscalemove: addi $22, $0, 1
+
+initposbuckets: lw $14, 0($0)
+addi $15, $0, 0
+addi $16, $0, 100
+addi $17, $0, 580
+addi $18, $0, 300
+addi $20, $0, 400
+
+j initcountbuckets
+
+initcountbuckets: addi $4, $0, 19999
+addi $5, $0, 0
+j gameloopbuckets
+
+gameloopbuckets: blt $4, $5, gamelogicbuckets
+addi $5, $5, 1
+j gameloopbuckets
+
+gamelogicbuckets: noop
+noop
+noop
+noop
+noop
+add $14, $14, $28
+addi $15, $15, 640
+addi $20, $20, 640
+addi $16, $16, 640
+addi $17, $17, 640
+addi $18, $18, 640
+noop
+noop
+noop
+noop
+noop
+add $13, $14, $16
+bne $13, $0, hitenemy1
+backfromhitenemy1: noop
+add $13, $14, $17
+bne $13, $0, hitenemy2
+backfromhitenemy2: noop
+add $13, $14, $18
+bne $13, $0, hitenemy3
+backfromhitenemy3: noop
+add $13, $14, $15
+bne $13, $0, hitfriend
+backfromhitfriend: noop
+add $13, $14, $20 
+bne $13, $0, powerup
+backfrompowerup: noop
+blt $10, $15, missedfriend
+backfrommissedfriend: noop
+j initcountbuckets
+
+missedfriend: addi $24, $24, -1
+j backfrommissedfriend
+
+hitfriend: addi $25, $25, 1
+add $15, $0, $10
+j backfromhitfriend
+
+hitenemy1: addi $24, $24, -1
+add $16, $0, $10
+j backfromhitenemy1
+
+hitenemy2: addi $24, $24, -1
+add $17, $0, $10
+j backfromhitenemy2
+
+hitenemy3: addi $24, $24, -1
+add $18, $0, $10
+j backfromhitenemy3
+
+powerup: 
+jal 0
+addi $20, $0, -25340
+j backfrompowerup
+
+.data

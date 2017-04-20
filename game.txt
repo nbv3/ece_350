@@ -1,0 +1,141 @@
+.text
+
+
+initscore: addi $25, $0, 0 
+initlives: addi $24, $0, 3
+initscreenlength: addi $10, $0, 60000
+addi $10, $10, 60000
+addi $10, $10, 62000
+addi $10, $10, 65000
+addi $10, $10, 60200
+initscalemove: addi $22, $0, 1
+
+initposbuckets: lw $14, 0($0)
+addi $15, $0, -12820
+addi $16, $0, -12620
+addi $20, $0, -12370
+addi $17, $0, -50770
+addi $18, $0, -51020
+j initcountbuckets
+
+initcountbuckets: addi $4, $0, 19999
+addi $5, $0, 0
+j gameloopbuckets
+
+gameloopbuckets: blt $4, $5, gamelogicbuckets
+addi $5, $5, 1
+j gameloopbuckets
+
+gamelogicbuckets: addi $1, $0, 1
+blt $24, $1, gameover
+addi $1, $0, 10
+blt $1, $25, changelevel
+noop
+noop
+noop
+noop
+add $14, $14, $28
+addi $15, $15, 640
+addi $20, $20, 640
+addi $16, $16, 640
+addi $17, $17, 640
+addi $18, $18, 640
+noop
+noop
+noop
+noop
+add $13, $14, $16
+bne $13, $0, hitenemy1
+backfromhitenemy1: noop
+add $13, $14, $17
+bne $13, $0, hitenemy2
+backfromhitenemy2: noop
+add $13, $14, $18
+bne $13, $0, hitenemy3
+backfromhitenemy3: noop
+add $13, $14, $15
+bne $13, $0, hitfriend
+backfromhitfriend: noop
+add $13, $14, $20 
+bne $13, $0, powerup
+backfrompowerup: noop
+blt $10, $15, missedfriend
+backfrommissedfriend: noop
+j initcountbuckets
+
+missedfriend: addi $24, $24, -1
+j backfrommissedfriend
+
+hitfriend: addi $25, $25, 1
+add $15, $0, $10
+j backfromhitfriend
+
+hitenemy1: addi $24, $24, -1
+add $16, $0, $10
+j backfromhitenemy1
+
+hitenemy2: addi $24, $24, -1
+add $17, $0, $10
+j backfromhitenemy2
+
+hitenemy3: addi $24, $24, -1
+add $18, $0, $10
+j backfromhitenemy3
+
+powerup: 
+jal 0
+addi $20, $0, -25340
+j backfrompowerup
+
+changelevel: noop
+noop
+noop
+noop
+addi $26, $0, 1
+j initposhunter
+
+initposhunter: addi $15, $0, 650
+addi $20, $0, 13000
+j initcounthunter
+
+initcounthunter: addi $4, $0, 19999
+addi $5, $0, 0
+j gameloophunter
+
+gameloophunter: blt $4, $5, gamelogichunter
+addi $5, $5, 1
+j gameloophunter
+
+gamelogichunter: addi $15, $15, 1
+addi $20, $20, 1
+noop
+add $22, $22, $23
+noop
+noop
+noop
+noop
+add $14, $14, $28
+add $14, $14, $29
+noop
+noop
+noop
+noop
+add $13, $14, $15
+and $11, $13, $27
+bne $11, $0, killbird
+backfromkillbird: noop
+j initcounthunter
+
+killbird: addi $25, $25, 1
+addi $15, $0, 0
+j backfromkillbird
+
+
+gameover: addi $26, $0, 100
+halt
+
+
+
+.data
+
+
