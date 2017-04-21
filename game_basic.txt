@@ -126,7 +126,7 @@ j initposhunter
 
 initposhunter: addi $15, $0, 650
 addi $20, $0, 13000
-addi $21, $0, 20
+addi $21, $0, 96
 j initcounthunter
 
 initcounthunter: addi $4, $0, 60000
@@ -162,10 +162,10 @@ killbird: addi $25, $25, 1
 j makebirdred
 backfrommakebirdred: noop
 addi $15, $0, 0
-addi $21, $0, 20
+addi $21, $0, 96
 j backfromkillbird
 
-makebirdred: addi $21, $0, 19
+makebirdred: addi $21, $0, 97
 addi $6, $0, 0
 addi $7, $0, 50000
 addi $7, $7, 50000
