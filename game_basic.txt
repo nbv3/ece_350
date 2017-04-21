@@ -1,6 +1,5 @@
 .text
 
-
 initscore: addi $25, $0, 0 
 initlives: addi $24, $0, 3
 initscreenlength: addi $10, $0, 60000
@@ -18,11 +17,11 @@ addi $17, $17, 36100
 addi $18, $0, 60000
 addi $18, $18, 60000
 addi $18, $18, 8400
-addi $20, $0, 0
+addi $20, $0, 350
 
 noop
 noop
-addi $6, $0, 5
+addi $6, $0, 3
 addi $7, $0, 0
 j initcountbuckets
 
@@ -121,7 +120,7 @@ gameloophunter: blt $4, $5, gamelogichunter
 addi $5, $5, 1
 j gameloophunter
 
-gamelogichunter: addi $15, $15, 641
+gamelogichunter: addi $15, $15, 1
 addi $20, $20, 1
 noop
 add $22, $22, $23
@@ -150,7 +149,17 @@ j backfromkillbird
 
 makebirdred: addi $21, $0, 19
 addi $6, $0, 0
-addi $7, $0, 1000
+addi $7, $0, 50000
+addi $7, $7, 50000
+addi $7, $7, 50000
+addi $7, $7, 50000
+addi $7, $7, 50000
+addi $7, $7, 50000
+addi $7, $7, 50000
+addi $7, $7, 50000
+addi $7, $7, 50000
+addi $7, $7, 50000
+addi $7, $7, 50000
 j smallspin
 backfromsmallspin: j backfrommakebirdred
 
@@ -160,7 +169,6 @@ j smallspin
 
 gameover: addi $26, $0, 100
 halt
-
 
 
 .data
