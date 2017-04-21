@@ -23,7 +23,25 @@ noop
 noop
 addi $6, $0, 3
 addi $7, $0, 0
-j initcountbuckets
+j setupspin
+
+setupspin: addi $4, $0, 19999
+addi $4, $0, 19999
+addi $4, $0, 19999
+addi $4, $0, 19999
+addi $4, $0, 19999
+addi $4, $0, 19999
+addi $4, $0, 19999
+addi $4, $0, 19999
+addi $4, $0, 19999
+addi $4, $0, 19999
+addi $4, $0, 19999
+addi $5, $0, 0
+j beginspin
+
+beginspin: blt $4, $5, initcountbuckets
+addi $5, $5, 1
+j beginspin
 
 initcountbuckets: addi $4, $0, 19999
 addi $5, $0, 0
