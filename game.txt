@@ -11,11 +11,15 @@ addi $10, $10, 60200
 initscalemove: addi $22, $0, 1
 
 initposbuckets: lw $14, 0($0)
-addi $15, $0, -12820
-addi $16, $0, -12620
-addi $20, $0, -12370
-addi $17, $0, -50770
-addi $18, $0, -51020
+lw $15, $0, 1($0)
+lw $16, $0, 2($0)
+lw $20, $0, 3($0)
+lw $17, $0, 4($0)
+lw $18, $0, 5($0)
+noop
+noop
+addi $6, $0, 5
+addi $7, $0, 0
 j initcountbuckets
 
 initcountbuckets: addi $4, $0, 19999
@@ -36,11 +40,11 @@ noop
 noop
 add $14, $14, $28
 addi $15, $15, 640
-addi $20, $20, 640
 addi $16, $16, 640
 addi $17, $17, 640
 addi $18, $18, 640
-noop
+blt $6, $7, movepowerup
+backfrommovepowerup: noop
 noop
 noop
 noop
@@ -62,6 +66,10 @@ backfrompowerup: noop
 blt $10, $15, missedfriend
 backfrommissedfriend: noop
 j initcountbuckets
+
+movepowerup: addi $20, $20, 640
+addi $7, $0, 0
+j backfromovepowerup
 
 missedfriend: addi $24, $24, -1
 j backfrommissedfriend
@@ -98,7 +106,7 @@ initposhunter: addi $15, $0, 650
 addi $20, $0, 13000
 j initcounthunter
 
-initcounthunter: addi $4, $0, 19999
+initcounthunter: addi $4, $0, 50000
 addi $5, $0, 0
 j gameloophunter
 
